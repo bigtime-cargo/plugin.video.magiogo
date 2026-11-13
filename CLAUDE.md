@@ -11,8 +11,9 @@ decryption fungujú (`kodi.log`: "Manifest successfully parsed", h264
 snímky sa reálne dekódovali a renderovali cez VAAPI ~50 s bez chyby).
 Licenčný server NEPOTREBUJE žiadnu Authorization hlavičku (pôvodná
 neistota v `widevine_license()` sa potvrdila v prospech prázdnych
-headers). Archív/catchup a správanie pri dlhšej pauze (KeepAlive prahy)
-ešte NEOVERENÉ v reálnom Kodi.
+headers). Archív/catchup OVERENÉ v reálnom Kodi (13. 11. 2026, verzia
+0.1.1) — viď sekcia "Archív" nižšie. Správanie pri dlhšej pauze (KeepAlive
+prahy) ešte NEOVERENÉ.
 
 ## Štruktúra
 
@@ -52,9 +53,9 @@ je balík `@24i/prj-1260-stl-nxg` verzia 5.0.4.
   Pole `channel.liveSubscription` hovorí priamo, či má used predplatné na
   live (filtrovať na toto — Magio to na rozdiel od O2 TV nehovorí cez
   samostatné `playbackContext` volanie na kanál, takže žiadny ekvivalent
-  `entitled_cached()` netreba). `channel.archiveSubscription` je
-  NESPOĽAHLIVÉ — bolo `false` aj na kanáli, kde ARCHIVE stream prešiel bez
-  problému; `api.channels()` sa drží len `hasArchive`. Číslo kanála je
+  `entitled_cached()` netreba). `channel.archiveSubscription` je `false`
+  pri všetkých kanáloch testovaného účtu (len ~4 h archív, viď "Archív");
+  `api.channels()` sa drží `hasArchive`. Číslo kanála je
   `channel.defaultChannelPosition` (NIE `channelNumber`, to pole v odpovedi
   nie je).
 - **EPG**: `GET /v2/television/epg?filter=startTime=ge=<deň>T00:00:00.000Z;
@@ -98,6 +99,26 @@ je balík `@24i/prj-1260-stl-nxg` verzia 5.0.4.
   chyby. Manifest samotný nenesie `<ContentProtection>` — DRM nastavuje
   len `inputstream.adaptive.license_*` properties v `addon.py`.
 
+## Archív (overené v Kodi 13. 11. 2026)
+
+- `stream-url` pre ARCHIVE musí mať PRESNE parametre webu: `service=ARCHIVE
+  &devtype=OTT_LINUX&id=<scheduleId>&prof=p0&ecid=&drm=verimatrix&startTime=0`
+  (BEZ `name`, `prof=p0`). S `name=Web Browser&prof=p5` server odmietol
+  archív ako "Nemáte aktivovanú doplnkovú službu Magio TV Archív".
+- **Hĺbka archívu na testovanom účte je len cca 4 hodiny** (zodpovedá
+  `channel.timeshift=240`), nie 7 dní z `channel.archive=604800000`.
+  Staršie programy server odmieta tou istou hláškou; web pri 2 dni starom
+  programe ponúka len "Nahrať", nie "Pozerať". `archiveSubscription` je
+  `false` pri všetkých kanáloch a zodpovedá tomu (nie je "nespoľahlivý").
+  Preto `catchup-days="1"` v playliste.
+- **IPTV Simple posúva čas v catchup URL** (`start_ts` o -5 min,
+  `end_ts` o +15 min, nastavenia `catchupWatchEpg*BufferMins`). Hľadanie
+  programu podľa `start_ts` preto vybralo PREDCHÁDZAJÚCI program. Riešenie:
+  `<programme catchup-id="<scheduleId>">` v epg.xml a `{catchup-id}` v
+  `catchup-source` (parameter `sid`). Podľa času sa hľadá len ako záloha.
+- IPTV Simple inštancia "Magio GO" (`instance-settings-3.xml`) číta
+  `playlist.m3u` a `epg.xml` z profilu doplnku; skupina "Magio GO (archív)".
+
 ## Prečo (zatiaľ) žiadne preskakovanie reklám
 
 Na rozdiel od O2 TV (`ads.py`, SCTE-35 `EventStream` v MPD), manifest Magio
@@ -108,10 +129,6 @@ teda zatiaľ nedá urobiť rovnako ako pri O2 TV — ak sa objaví iný mechaniz
 
 ## Čo (zatiaľ) chýba oproti O2 TV
 
-- **Archívne prehrávanie v reálnom Kodi** — `resolve()`/ARCHIVE service je
-  overené len priamymi HTTP volaniami mimo Kodi (pozri `tools/login.py`
-  a ad-hoc skripty v `~/magio/`), nie reálnym prehrávaním cez catchup
-  IPTV Simple alebo priamo v doplnku. Live vysielanie JE overené (vyššie).
 - **KeepAlive prahy** (40 s / 45 min) sú skopírované z O2 TV, nie zmerané
   na Magio GO — treba reálny test dlhšej pauzy v Kodi.
 - **EndWatch** (pokračovanie na ďalší program z EPG po skončení aktuálneho,

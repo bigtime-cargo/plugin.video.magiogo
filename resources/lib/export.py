@@ -59,7 +59,9 @@ def build_m3u(chans, epg_url=None):
         if c.get("number"):
             attrs += ' tvg-chno="%s"' % c["number"]
         if c.get("has_archive"):
-            attrs += ' catchup="default" catchup-days="7"'
+            # ucet ma archiv len cca 4 h dozadu (kanal.timeshift=240 min), vsetko
+            # starsie server odmieta ("Nemate aktivovanu sluzbu Magio TV Archiv")
+            attrs += ' catchup="default" catchup-days="1"'
             attrs += (' catchup-source="%s?action=play&cid=%s'
                       '&sid={catchup-id}&start_ts={utc}&end_ts={utcend}"'
                       % (PLUGIN, cid))

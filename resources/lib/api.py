@@ -346,7 +346,11 @@ class MagioAPI:
                 self.last_mode = "ARCHIVE cid=%s sched=%s" % (channel_id, schedule_id)
                 return self.stream_url("ARCHIVE", schedule_id, quality)
             except MagioError as e:
-                if getattr(e, "code", "") == "NOSESSION":
+                # LIVE ako zaloha len pre program, ktory este bezi (end_ts
+                # nesie +15 min buffer IPTV Simple). Starsi program mimo
+                # hlbky archivu (cca 4 h) sa ma ukazat ako chyba, nie hrat live.
+                if getattr(e, "code", "") == "NOSESSION" or (
+                        end_ts and int(end_ts) < now - 10):
                     raise
                 if self._log:
                     self._log("ARCHIVE sched=%s zlyhal (%s), skúšam LIVE"
