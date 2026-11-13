@@ -2,9 +2,17 @@
 
 Kodi doplnok pre Magio GO (Slovak Telekom). Postavený rovnako ako
 `~/plugin.video.o2tv` — žiadny server, žiadny sidecar, každé zariadenie
-sebestačné. STAV: prototyp, netestovaný v reálnom Kodi (len mimo Kodi,
-priamymi HTTP volaniami). Pred prvým vydaním treba odskúšať prehrávanie
-(Widevine licencia, DASH, catchup) na ozajstnom Kodi s inputstream.adaptive.
+sebestačné.
+
+STAV (13. 11. 2026): **živé vysielanie overené v reálnom Kodi 21.3** na PC
+(Kubuntu, AMD RX 580, VAAPI) — prihlásenie, zoznam kanálov, automatické
+odpojenie zariadenia pri DEVICE_MAX_LIMIT, DASH manifest aj Widevine DRM
+decryption fungujú (`kodi.log`: "Manifest successfully parsed", h264
+snímky sa reálne dekódovali a renderovali cez VAAPI ~50 s bez chyby).
+Licenčný server NEPOTREBUJE žiadnu Authorization hlavičku (pôvodná
+neistota v `widevine_license()` sa potvrdila v prospech prázdnych
+headers). Archív/catchup a správanie pri dlhšej pauze (KeepAlive prahy)
+ešte NEOVERENÉ v reálnom Kodi.
 
 ## Štruktúra
 
@@ -77,13 +85,17 @@ je balík `@24i/prj-1260-stl-nxg` verzia 5.0.4.
   preto rozbaľuje presmerovanie a `service.py` má prevzatý `KeepAlive` z
   O2 TV — **prahy (40 s do 403, 45 min max pauza) sú PREVZATÉ, NEOVERENÉ**
   na Magio GO. Treba reálny test dlhšej pauzy v Kodi.
-- **DRM (Widevine)**: `GET /v2/home/config?language=SK` → pole
-  `drmIntegration` (`STREAM_KEEPER`/`VERIMATRIX`) a
-  `widevineStreamKeeperDrmUrl` (`https://multidrm.core.verimatrixcloud.net/widevine`).
-  Autorizácia k licenčnému serveru je **rovnaký Bearer token ako na API**
-  (zistené z JS web klienta — `DRM_AUTH_HEADER.SCHEME` je prázdne, teda
-  `Authorization: <accessToken>` bez `Bearer ` prefixu; `api.py` to tak aj
-  robí). Manifest samotný nenesie `<ContentProtection>` — DRM nastavuje
+- **DRM (Widevine) — OVERENÉ V REÁLNOM KODI 13. 11. 2026**: `GET
+  /v2/home/config?language=SK` → pole `drmIntegration`
+  (`STREAM_KEEPER`/`VERIMATRIX`) a `widevineStreamKeeperDrmUrl`
+  (`https://multidrm.core.verimatrixcloud.net/widevine`). Licenčný server
+  **nepotrebuje žiadnu `Authorization` hlavičku** — v JS web klienta sa
+  zdalo, že by mal byť `ecid` z odpovede `stream-url`, ten je ale v praxi
+  `null`, teda hlavička je prázdna (`widevine_license()` v `api.py` to tak
+  rieši) a reálne prehrávanie (AMC HD, 13. 11. 2026, Kodi 21.3 + VAAPI) to
+  potvrdilo — `kodi.log` ukázal "Manifest successfully parsed" a h264
+  snímky sa reálne dekódovali a vykresľovali ~50 s bez CDM/licenčnej
+  chyby. Manifest samotný nenesie `<ContentProtection>` — DRM nastavuje
   len `inputstream.adaptive.license_*` properties v `addon.py`.
 
 ## Prečo (zatiaľ) žiadne preskakovanie reklám
@@ -96,11 +108,12 @@ teda zatiaľ nedá urobiť rovnako ako pri O2 TV — ak sa objaví iný mechaniz
 
 ## Čo (zatiaľ) chýba oproti O2 TV
 
-- **Reálny test v Kodi** — login/heslo, zoznam kanálov, live aj archívne
-  prehrávanie, Widevine licencia. Doteraz overené len mimo Kodi (priame
-  HTTP volania, pozri `tools/login.py` a ad-hoc skripty v `~/magio/`).
+- **Archívne prehrávanie v reálnom Kodi** — `resolve()`/ARCHIVE service je
+  overené len priamymi HTTP volaniami mimo Kodi (pozri `tools/login.py`
+  a ad-hoc skripty v `~/magio/`), nie reálnym prehrávaním cez catchup
+  IPTV Simple alebo priamo v doplnku. Live vysielanie JE overené (vyššie).
 - **KeepAlive prahy** (40 s / 45 min) sú skopírované z O2 TV, nie zmerané
-  na Magio GO.
+  na Magio GO — treba reálny test dlhšej pauzy v Kodi.
 - **EndWatch** (pokračovanie na ďalší program z EPG po skončení aktuálneho,
   pozri O2 TV `service.py`) tu nie je — netestované, či to Magio GO vôbec
   potrebuje (môže sa prejaviť rovnaký problém so zamrznutím na konci
