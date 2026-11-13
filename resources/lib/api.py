@@ -311,8 +311,19 @@ class MagioAPI:
         recordingId podľa service. Vracia (url, extra) - extra je cela
         odpoved pre diagnostiku (seekingForbidden, timeshift, ...)."""
         self.ensure_session()
-        params = {"service": service, "name": DEVICE_NAME, "devtype": DEVICE_TYPE,
-                  "id": asset_id, "prof": quality, "ecid": "", "drm": "verimatrix"}
+        if service == "ARCHIVE":
+            # Presne ako web klient magiogo.sk (zachytene 13. 11. 2026):
+            # bez `name`, prof=p0, startTime=0. S `name=Web Browser` a
+            # prof=p5 server odmietol archiv hlaskou "Nemate aktivovanu
+            # doplnkovu sluzbu Magio TV Archiv", hoci web ten isty program
+            # prehral.
+            params = {"service": service, "devtype": DEVICE_TYPE,
+                      "id": asset_id, "prof": "p0", "ecid": "",
+                      "drm": "verimatrix", "startTime": "0"}
+        else:
+            params = {"service": service, "name": DEVICE_NAME,
+                      "devtype": DEVICE_TYPE, "id": asset_id,
+                      "prof": quality, "ecid": "", "drm": "verimatrix"}
         try:
             res = self._call("GET", "/v2/television/stream-url", params=params)
         except MagioError as e:
