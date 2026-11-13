@@ -61,7 +61,8 @@ def build_m3u(chans, epg_url=None):
         if c.get("has_archive"):
             attrs += ' catchup="default" catchup-days="7"'
             attrs += (' catchup-source="%s?action=play&cid=%s'
-                      '&start_ts={utc}&end_ts={utcend}"' % (PLUGIN, cid))
+                      '&sid={catchup-id}&start_ts={utc}&end_ts={utcend}"'
+                      % (PLUGIN, cid))
         out.append('#EXTINF:-1 %s,%s' % (attrs, c["name"]))
         out.append('%s?action=play&cid=%s' % (PLUGIN, cid))
     return "\n".join(out) + "\n"
@@ -103,8 +104,14 @@ def build_xmltv(api, chans, days_back=7, days_fwd=3, log=None, should_stop=None)
                 if ps is None or pe is None:
                     continue
                 prog = p.get("program") or {}
-                xml.append('<programme start="%s" stop="%s" channel="%s">' % (
-                    fmt(ps / 1000.0), fmt(pe / 1000.0), xesc(ch)))
+                # catchup-id = scheduleId konkretneho vysielania; IPTV Simple ho
+                # dosadi do {catchup-id} v catchup-source, takze archiv nehada
+                # program podla casu (IPTV Simple posuva start_ts o -5 min a
+                # end_ts o +15 min, co vybralo predchadzajuci program).
+                sid = p.get("scheduleId")
+                xml.append('<programme start="%s" stop="%s" channel="%s"%s>' % (
+                    fmt(ps / 1000.0), fmt(pe / 1000.0), xesc(ch),
+                    ' catchup-id="%s"' % xesc(sid) if sid else ""))
                 xml.append('<title>%s</title>' % xesc(prog.get("title", "")))
                 if prog.get("description"):
                     xml.append('<desc>%s</desc>' % xesc(prog["description"]))

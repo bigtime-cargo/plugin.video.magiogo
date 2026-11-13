@@ -123,14 +123,14 @@ def cdn_session(url):
         return url
 
 
-def play(api, cid, start_ts=None, end_ts=None):
+def play(api, cid, start_ts=None, end_ts=None, sid=None):
     try:
         try:
-            manifest, info = api.resolve(cid, start_ts, end_ts)
+            manifest, info = api.resolve(cid, start_ts, end_ts, schedule_id=sid)
         except MagioError as e:
             if getattr(e, "code", "") != "NOSESSION" or not do_login(api, silent=True):
                 raise
-            manifest, info = api.resolve(cid, start_ts, end_ts)
+            manifest, info = api.resolve(cid, start_ts, end_ts, schedule_id=sid)
         log("resolve: %s" % getattr(api, "last_mode", "?"))
     except MagioError as e:
         log("resolve zlyhal (%s): %s" % (getattr(api, "last_mode", "?"), e))
@@ -151,6 +151,8 @@ def play(api, cid, start_ts=None, end_ts=None):
         resume["start_ts"] = start_ts
     if end_ts:
         resume["end_ts"] = end_ts
+    if sid:
+        resume["sid"] = sid
     win.setProperty(RESUME_PROP, url_for(**resume))
 
     li = xbmcgui.ListItem(path=manifest)
@@ -187,7 +189,8 @@ def main():
         cid = args.get("cid", [None])[0]
         st = args.get("start_ts", [None])[0]
         et = args.get("end_ts", [None])[0]
-        play(api, cid, int(st) if st else None, int(et) if et else None)
+        sid = args.get("sid", [None])[0]
+        play(api, cid, int(st) if st else None, int(et) if et else None, sid)
     elif action == "login":
         do_login(api)
         xbmc.executebuiltin("Container.Refresh")

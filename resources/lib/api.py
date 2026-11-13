@@ -333,12 +333,26 @@ class MagioAPI:
                 raise
         return res.get("url"), res
 
-    def resolve(self, channel_id, start_ts=None, end_ts=None, quality="p5"):
-        """Vráti (manifest_url, info). Minulý program (end_ts v minulosti)
-        ide cez ARCHIVE podľa programId z EPG; inak LIVE (so sliding-window
-        timeshiftom, co zabezpeci inputstream.adaptive)."""
+    def resolve(self, channel_id, start_ts=None, end_ts=None, quality="p5",
+                schedule_id=None):
+        """Vráti (manifest_url, info). Program so známym scheduleId (z
+        catchup-id v EPG) ide cez ARCHIVE; ak ARCHIVE zlyhá (napr. program
+        ešte beží), LIVE. Bez scheduleId sa program hľadá podľa času:
+        minulý program (end_ts v minulosti) cez ARCHIVE, inak LIVE (so
+        sliding-window timeshiftom, co zabezpeci inputstream.adaptive)."""
         now = int(time.time())
-        if start_ts and end_ts and int(end_ts) < now - 10:
+        if schedule_id:
+            try:
+                self.last_mode = "ARCHIVE cid=%s sched=%s" % (channel_id, schedule_id)
+                return self.stream_url("ARCHIVE", schedule_id, quality)
+            except MagioError as e:
+                if getattr(e, "code", "") == "NOSESSION":
+                    raise
+                if self._log:
+                    self._log("ARCHIVE sched=%s zlyhal (%s), skúšam LIVE"
+                             % (schedule_id, e))
+            self.last_mode = "LIVE cid=%s (ARCHIVE zlyhal)" % channel_id
+        elif start_ts and end_ts and int(end_ts) < now - 10:
             prog = self.find_programme(channel_id, int(start_ts), int(end_ts))
             if prog:
                 self.last_mode = "ARCHIVE cid=%s prog=%s" % (channel_id, prog)

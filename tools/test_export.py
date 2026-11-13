@@ -57,6 +57,25 @@ class SkupinyVExporte(unittest.TestCase):
         self.assertIn('group-title="Magio GO (archív);Správy"', l)
 
 
+class CatchupId(unittest.TestCase):
+    def test_catchup_source_pouziva_catchup_id(self):
+        l = [l for l in export.build_m3u(CHANS).splitlines() if l.startswith("#EXTINF")][0]
+        self.assertIn("&sid={catchup-id}&start_ts={utc}&end_ts={utcend}", l)
+
+    def test_programme_nesie_catchup_id(self):
+        class FakeApi:
+            def epg_day(self, ts):
+                return [{"channel": {"channelId": 4099}, "programs": [
+                    {"startTimeUTC": 1794578400000, "endTimeUTC": 1794581400000,
+                     "scheduleId": 140868577452082, "program": {"title": "Otec Brown"}},
+                    {"startTimeUTC": 1794581400000, "endTimeUTC": 1794582000000,
+                     "program": {"title": "Bez ID"}}]}]
+        xml, failed = export.build_xmltv(FakeApi(), [{"id": "4099", "name": "Jednotka HD"}],
+                                         days_back=0, days_fwd=0)
+        self.assertIn(' catchup-id="140868577452082">', xml)
+        self.assertEqual(xml.count("catchup-id="), 1)
+
+
 class XmlEscaping(unittest.TestCase):
     def test_xesc_specialne_znaky(self):
         self.assertEqual(export.xesc('<a & "b" \'c\'>'),
