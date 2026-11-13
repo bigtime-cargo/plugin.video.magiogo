@@ -129,6 +129,13 @@ je balík `@24i/prj-1260-stl-nxg` verzia 5.0.4.
   programu podľa `start_ts` preto vybralo PREDCHÁDZAJÚCI program. Riešenie:
   `<programme catchup-id="<scheduleId>">` v epg.xml a `{catchup-id}` v
   `catchup-source` (parameter `sid`). Podľa času sa hľadá len ako záloha.
+- **Od 13. 11. 2026 čítajú playlist a EPG Magio GO spolu s O2 TV a Streamletom
+  spoločne cez `service.bigtime.setup` 1.2.0** (jedna inštancia "Bigtime TV",
+  `addon_data/service.bigtime.setup/bigtime.m3u`), aby sa skupiny v Kodi
+  neopakovali. Samostatná inštancia "Magio GO" už nie je potrebná; ak existuje,
+  setup nič nespája (pozri `~/kodi-repo/service.bigtime.setup/CLAUDE.md`).
+  README ešte opisuje ručné nastavenie (krok 3) — treba prepísať pri ďalšom
+  vydaní.
 - IPTV Simple inštancia "Magio GO" (`instance-settings-3.xml`) číta
   `playlist.m3u` a `epg.xml` z profilu doplnku; skupina "Magio GO (archív)".
 
