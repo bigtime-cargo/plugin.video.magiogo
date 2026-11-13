@@ -119,13 +119,35 @@ je balík `@24i/prj-1260-stl-nxg` verzia 5.0.4.
 - IPTV Simple inštancia "Magio GO" (`instance-settings-3.xml`) číta
   `playlist.m3u` a `epg.xml` z profilu doplnku; skupina "Magio GO (archív)".
 
-## Prečo (zatiaľ) žiadne preskakovanie reklám
+## Reklamy — ako to funguje na Magio GO (výskum 13. 11. 2026)
 
-Na rozdiel od O2 TV (`ads.py`, SCTE-35 `EventStream` v MPD), manifest Magio
-GO **žiadne SCTE-35 značky nemá** (overené na živom kanáli 13. 11. 2026) a
-server navyše vracia `seekingForbidden: true`. Preskakovanie reklám sa
-teda zatiaľ nedá urobiť rovnako ako pri O2 TV — ak sa objaví iný mechanizmus
-(napr. iný formát v archívnych manifestoch), treba ho najprv nájsť.
+Nie je to SCTE-35 v manifeste ako pri O2 TV (manifest žiadne značky nemá).
+Reklamné bloky dodáva osobitný endpoint a prehráva ich web klient sám:
+
+- Len **8 kanálov** má `adsSeekingForbidden: true` v
+  `GET /v3/television/channels-brief?list=all&forceV2Logo=true&phv=<claim phv z JWT>`:
+  Markíza HD (4044), JOJ HD (4070), Plus HD (4222), JOJ KRIMI HD (4223),
+  Doma HD (4221), DAJTO HD (4111), Markíza KRIMI HD (4557), Markíza Klasik
+  HD (4602). Ostatné kanály (Jednotka, Dvojka, ...) žiadne bloky nemajú
+  (`ADS_NOT_REQUIRED`, HTTP 417).
+- Bloky: `GET https://ads-sk.cdn.magio.tv/schedules/ads?service=ARCHIVE
+  &scheduleId=<scheduleId programu>` (base z `home/config.adsBlocksCdnBaseUrl`),
+  stačí `Authorization: Bearer`. Odpoveď: `adSkipPolicy`,
+  `gracePeriodInSeconds`, `forceWatchEveryAd`, `adBlocks[]` s
+  `adStartTimeUTC`, `adSkipTimeUTC`, `adEndTimeUTC` (ISO UTC).
+  Pre budúci program HTTP 400 "no ads data for future schedule".
+- **Politika závisí od toho, či program skončil**:
+  - skončený program (archív): `PARTIAL_SKIPPABLE`, `forceWatchEveryAd=false`,
+    grace 60 s. V bloku treba pozrieť prvých ~3 min (od `adStart` do
+    `adSkip`), potom sa dá preskočiť na `adEnd`.
+  - práve bežiaci program (live): `NOT_SKIPPABLE`, `forceWatchEveryAd=true`.
+  - tretia hodnota `FULLY_SKIPPABLE` sa v JS klienta vyskytuje, tu sa nevidela.
+- Web ju vynucuje v prehrávači (`seekingRestrictions`, časová os s
+  `skipOffset = adSkipTimeUTC`). Pozícia v archívnom streame =
+  čas bloku − začiatok programu (manifest archívu má `start=`/`end=` presne
+  na hraniciach programu). Či server/CDN vynucuje aj sám (seekingForbidden:
+  true v stream-url), NEOVERENÉ - treba zistiť, či sa dá v Kodi vôbec seekovať
+  v archívnom streame.
 
 ## Čo (zatiaľ) chýba oproti O2 TV
 
