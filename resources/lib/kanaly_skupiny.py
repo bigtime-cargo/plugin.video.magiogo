@@ -3,7 +3,6 @@
 # POZOR: rovnaký súbor je aj v doplnku plugin.video.o2tv a v
 # service.bigtime.streamlet (resources/lib/kanaly_skupiny.py). Pri zmene
 # pravidiel zmeň všetky kópie (testy v nich kontrolujú tie isté kanály).
-# VÝNIMKA: group_title() je tu zámerne iná - skupiny majú prefix „Magio GO“.
 import re
 import unicodedata
 
@@ -19,8 +18,7 @@ TEMY = [
     'Regionálne',
     'Ostatné',
 ]
-PREFIX = 'Magio GO'
-ARCHIV = PREFIX + ' (archív)'   # skupina kanálov z Magio GO, ktoré majú archív
+ARCHIV = 'Magio GO (archív)'   # skupina kanálov z Magio GO, ktoré majú archív
 
 _BRACKETS = re.compile(r'[\(\[][^\)\]]*[\)\]]')
 _NONWORD = re.compile(r'[^0-9a-zЀ-ӿ]+')
@@ -69,11 +67,9 @@ def tema(name):
 
 
 def group_title(name, archive=False):
-    """Hodnota `group-title` pre M3U. Skupiny nesú prefix „Magio GO“, aby sa
-    v zozname kanálov nemiešali s O2 TV, Streamletom ani NBA (tie používajú
-    holé názvy tém). Kanály s archívom navyše patria do skupiny ARCHIV.
+    """Hodnota `group-title` pre M3U: téma, pre O2 TV navyše skupina s archívom.
     IPTV Simple berie viac skupín oddelených bodkočiarkou."""
-    t = '%s – %s' % (PREFIX, tema(name))
+    t = tema(name)
     return ';'.join([ARCHIV, t]) if archive else t
 
 

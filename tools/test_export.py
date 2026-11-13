@@ -43,13 +43,6 @@ class SkupinyVExporte(unittest.TestCase):
         for l in self.extinf:
             self.assertEqual(l.count("group-title="), 1)
 
-    def test_vsetky_temy_maju_prefix_magio_go(self):
-        for l in self.extinf:
-            skupiny = re.search(r'group-title="([^"]*)"', l).group(1).split(";")
-            tema = [g for g in skupiny if g != 'Magio GO (archív)']
-            self.assertEqual(len(tema), 1)
-            self.assertTrue(tema[0].startswith('Magio GO – '), tema[0])
-
     def test_tvg_chno_sa_nemeni(self):
         nums = [re.search(r'tvg-chno="(\d+)"', l).group(1) for l in self.extinf]
         self.assertEqual(nums, ["1", "4", "8", "9", "99"])
@@ -61,7 +54,7 @@ class SkupinyVExporte(unittest.TestCase):
 
     def test_ta3_je_spravy(self):
         l = next(l for l in self.extinf if ',TA3' in l)
-        self.assertIn('group-title="Magio GO (archív);Magio GO – Správy"', l)
+        self.assertIn('group-title="Magio GO (archív);Správy"', l)
 
 
 class XmlEscaping(unittest.TestCase):
