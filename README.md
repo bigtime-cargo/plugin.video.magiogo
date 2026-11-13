@@ -22,7 +22,7 @@ Potrebný je `inputstream.adaptive` s Widevine.
 
 Zelená guľička pri programe v EPG znamená, že sa dá pozrieť z archívu. Doplnok
 ju ukazuje len pri programoch, ktoré skončili a sú ešte v archíve (približne
-posledné 3 hodiny), takže podľa nej vidíš, dokedy sa dá archív spustiť.
+posledné 4 hodiny), takže podľa nej vidíš, dokedy sa dá archív spustiť.
 
 Nastavenia „Kanály“: skrytie kanálov, ktoré sú aj v doplnku O2 TV, a
 regionálnych televízií (č. 500+). Obe voľby sú predvolene zapnuté, vypni ich,

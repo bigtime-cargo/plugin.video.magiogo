@@ -74,10 +74,11 @@ def build_m3u(chans, epg_url=None):
 # Hlbka archivu: server prehra program, ktoreho ZACIATOK nie je starsi nez
 # `timeshift` kanala (240 min; overene 13. 11. 2026: -3.95 h OK, -4.12 h nie).
 # Zelena gulicka v Kodi sa ridi pritomnostou catchup-id (catchup-days=-1), tak
-# ho davame len programom, ktore skoncili a pocas dalsich ~45 min (obnova
-# epg.xml + znovunacitanie IPTV Simple) budu urcite este v archive.
+# ho davame len programom, ktore skoncili a ktorych zaciatok nie je starsi nez
+# cela hlbka archivu. SAFETY_MIN = rezerva na obnovu epg.xml + znovunacitanie
+# IPTV Simple: 0 = guľička moze ostat az o ~40 min dlhsie, nez archiv naozaj hra.
 ARCHIVE_MIN = 240
-SAFETY_MIN = 45
+SAFETY_MIN = 0
 CATCHUP_WINDOW = (ARCHIVE_MIN - SAFETY_MIN) * 60
 
 
