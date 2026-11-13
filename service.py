@@ -262,7 +262,7 @@ def main():
                 except Exception as e:
                     log("export zlyhal: %s" % e, True)
                     last_export = time.time() - every + EXPORT_RETRY
-        if cache and time.time() - last_render > 540:
+        if cache and time.time() - last_render > 240:
             try:
                 n = rerender_epg(profile, cache, ADDON.getSetting("export_dir") or None,
                                  lambda m: log(m, True))
@@ -270,7 +270,7 @@ def main():
                 log("EPG prepísané z pamäte, programov v archíve: %d" % n)
             except Exception as e:
                 log("prepis EPG zlyhal: %s" % e, True)
-        if sleep_abortable(monitor, 600):
+        if sleep_abortable(monitor, 300):
             break
     log("service koniec")
 

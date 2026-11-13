@@ -71,20 +71,21 @@ class CatchupId(unittest.TestCase):
             "ch": ch, "start": now - start_h * h, "stop": now - (start_h - dur_h) * h,
             "title": "T", "desc": "", "sid": sid}
         return [mk("4099", 3.0, 1.0, 111),     # skoncil, 3 h dozadu -> archiv
-                mk("4099", 3.5, 0.5, 222),     # 3.5 h dozadu, skoncil -> este v archive
+                mk("4099", 3.9, 0.5, 222),     # zaciatok tesne v okne -> archiv
                 mk("4099", 4.2, 1.0, 333),     # zaciatok starsi nez 4 h -> nie
-                mk("4099", 0.5, 1.0, 444),     # este bezi -> nie
-                mk("4099", -1.0, 1.0, 555),    # buduci -> nie
+                mk("4099", 0.5, 1.0, 444),     # prave bezi -> ano
+                mk("4099", -0.2, 1.0, 555),    # zacne za 12 min (LEAD 20) -> ano
+                mk("4099", -1.0, 1.0, 777),    # zacne za hodinu -> nie
                 mk("9", 2.0, 1.0, 666),        # kanal bez archivu -> nie
                 mk("4099", 2.0, 0.5, None)]    # bez scheduleId -> nie
 
-    def test_catchup_id_len_pre_programy_v_archive(self):
+    def test_catchup_id_pre_archiv_aj_bezici_program(self):
         xml = export.render_xmltv(self.CH, self.progs(1794600000.0), now=1794600000.0)
         ids = re.findall(r'catchup-id="(\d+)"', xml)
-        self.assertEqual(ids, ["111", "222"])
+        self.assertEqual(ids, ["111", "222", "444", "555"])
 
-    def test_okno_archivu_nepresahuje_hlbku(self):
-        self.assertLessEqual(export.CATCHUP_WINDOW, export.ARCHIVE_MIN * 60)
+    def test_okno_archivu_je_240_minut(self):
+        self.assertEqual(export.CATCHUP_WINDOW, 240 * 60)
 
     def test_catchup_days_je_ignorovane(self):
         l = [l for l in export.build_m3u(CHANS).splitlines() if l.startswith("#EXTINF")][0]

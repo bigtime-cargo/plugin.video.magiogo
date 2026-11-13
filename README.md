@@ -17,12 +17,12 @@ Potrebný je `inputstream.adaptive` s Widevine.
    `userdata/addon_data/plugin.video.magiogo/` (trvá asi minútu, potom
    každých 12 hodín).
 3. V IPTV Simple Client pridaj inštanciu s týmito dvomi súbormi, zapni
-   catchup a nastav obnovu playlistu každých 30 minút (obnovou sa načíta aj
+   catchup a nastav obnovu playlistu každých 15 minút (obnovou sa načíta aj
    EPG). Kanály s archívom sú v skupine „Magio GO (archív)“.
 
 Zelená guľička pri programe v EPG znamená, že sa dá pozrieť z archívu. Doplnok
-ju ukazuje len pri programoch, ktoré skončili a sú ešte v archíve (približne
-posledné 4 hodiny), takže podľa nej vidíš, dokedy sa dá archív spustiť.
+ju ukazuje len pri programoch, ktoré sa dajú pozrieť od začiatku: bežiace a
+skončené v posledných 4 hodinách (a tesne pred začiatkom nového), takže podľa nej vidíš, dokedy sa dá archív spustiť.
 
 Nastavenia „Kanály“: skrytie kanálov, ktoré sú aj v doplnku O2 TV, a
 regionálnych televízií (č. 500+). Obe voľby sú predvolene zapnuté, vypni ich,

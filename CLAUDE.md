@@ -115,10 +115,15 @@ je balík `@24i/prj-1260-stl-nxg` verzia 5.0.4.
   nie), nezáleží na konci. Rovnaké na všetkých kanáloch (`timeshift=240`).
 - **Zelená guľička v Kodi** = `IsEPGTagPlayable` v IPTV Simple. Pri
   `catchup-days="-1"` je prehrateľný len program s `catchup-id` v XMLTV, preto
-  `render_xmltv()` dáva `catchup-id` len skončeným programom z posledných
-  `CATCHUP_WINDOW` (240 min, `SAFETY_MIN=0`; guľička môže ostať až ~40 min dlhšie,
-  než archív naozaj hrá — prepis EPG + znovunačítanie IPTV Simple). Služba prepisuje `epg.xml` z pamäte každých ~10 min (bez siete),
-  IPTV Simple ho načíta pri obnove inštancie (odporúča sa 30 min).
+  `render_xmltv()` dáva `catchup-id` programom so začiatkom v rozsahu
+  <teraz − 240 min, teraz + 20 min> (bežiaci aj práve skončený; ARCHIVE
+  funguje aj pri bežiacom programe od začiatku, pri programe, ktorý ešte
+  nezačal, zlyhá "relácia ešte nezačala"). Predstih 20 min (`LEAD_MIN`) kryje
+  oneskorenie nového programu: služba prepisuje `epg.xml` z pamäte každých ~5
+  min (bez siete), IPTV Simple ho načíta pri obnove inštancie (odporúča sa
+  15 min). Guľička preto môže byť až ~20 min pred začiatkom a až ~20 min
+  po vypršaní archívu. Niektoré programy majú práva obmedzené ("tento
+  program nie je možné prehrať") — vtedy doplnok spadne na LIVE.
 - **IPTV Simple posúva čas v catchup URL** (`start_ts` o -5 min,
   `end_ts` o +15 min, nastavenia `catchupWatchEpg*BufferMins`). Hľadanie
   programu podľa `start_ts` preto vybralo PREDCHÁDZAJÚCI program. Riešenie:

@@ -73,13 +73,18 @@ def build_m3u(chans, epg_url=None):
 
 # Hlbka archivu: server prehra program, ktoreho ZACIATOK nie je starsi nez
 # `timeshift` kanala (240 min; overene 13. 11. 2026: -3.95 h OK, -4.12 h nie).
+# ARCHIVE funguje aj pre prave bezici program (prehra od zaciatku), nie pre
+# program, ktory este nezacal ("relacia ešte nezačala").
 # Zelena gulicka v Kodi sa ridi pritomnostou catchup-id (catchup-days=-1), tak
-# ho davame len programom, ktore skoncili a ktorych zaciatok nie je starsi nez
-# cela hlbka archivu. SAFETY_MIN = rezerva na obnovu epg.xml + znovunacitanie
-# IPTV Simple: 0 = guľička moze ostat az o ~40 min dlhsie, nez archiv naozaj hra.
+# ho davame programom so zaciatkom v poslednych ARCHIVE_MIN minutach a este
+# programom, ktore zacnu v najblizsich LEAD_MIN minutach: nova relacia dostane
+# gulicku az pri dalsom prepise epg.xml (kazdych ~5 min) a znovunacitani IPTV
+# Simple (15 min), tak ju mame pripravenu dopredu (gulicka moze byt az o LEAD_MIN
+# minut skor, nez relacia zacne).
 ARCHIVE_MIN = 240
-SAFETY_MIN = 0
-CATCHUP_WINDOW = (ARCHIVE_MIN - SAFETY_MIN) * 60
+LEAD_MIN = 20
+CATCHUP_WINDOW = ARCHIVE_MIN * 60
+CATCHUP_LEAD = LEAD_MIN * 60
 
 
 def collect_programmes(api, chans, days_back=7, days_fwd=3, log=None, should_stop=None):
@@ -122,8 +127,9 @@ def render_xmltv(chans, progs, now=None):
     """XMLTV z uz stiahnutych programov (bez siete). catchup-id = scheduleId
     konkretneho vysielania; IPTV Simple ho dosadi do {catchup-id} v
     catchup-source (nehlada sa podla casu - IPTV Simple posuva start_ts o -5 min
-    a end_ts o +15 min, co vybralo predchadzajuci program). Dostane ho len
-    skonceny program z poslednych CATCHUP_WINDOW sekund na kanali s archivom."""
+    a end_ts o +15 min, co vybralo predchadzajuci program). Dostane ho program
+    na kanali s archivom, ktoreho zaciatok je v rozsahu <now - CATCHUP_WINDOW,
+    now + CATCHUP_LEAD> (bezici aj prave skonceny)."""
     now = time.time() if now is None else now
     archive = {c["id"] for c in chans if c.get("has_archive")}
     xml = ['<?xml version="1.0" encoding="UTF-8"?>',
@@ -134,8 +140,8 @@ def render_xmltv(chans, progs, now=None):
             '<icon src="%s"/>' % xesc(c["logo"]) if c.get("logo") else ""))
     for p in progs:
         cid = ""
-        if (p["sid"] and p["ch"] in archive and p["stop"] <= now
-                and p["start"] >= now - CATCHUP_WINDOW):
+        if (p["sid"] and p["ch"] in archive
+                and now - CATCHUP_WINDOW <= p["start"] <= now + CATCHUP_LEAD):
             cid = ' catchup-id="%s"' % xesc(p["sid"])
         xml.append('<programme start="%s" stop="%s" channel="%s"%s>' % (
             fmt(p["start"]), fmt(p["stop"]), xesc(p["ch"]), cid))
