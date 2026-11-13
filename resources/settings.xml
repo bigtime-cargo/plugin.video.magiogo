@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings>
+  <category label="Prihlásenie">
+    <setting id="username" type="text" label="Login (e-mail alebo prezývka Magio GO)" default=""/>
+    <setting id="password" type="text" option="hidden" label="Heslo" default=""/>
+    <setting label="Prihlásiť sa teraz" type="action" action="RunPlugin(plugin://plugin.video.magiogo/?action=login)"/>
+  </category>
+  <category label="Prehrávanie">
+    <setting id="max_bitrate" type="labelenum" label="Max. kvalita" values="Auto|1080p|720p|576p" default="Auto"/>
+  </category>
+  <category label="EPG">
+    <setting id="epg_days_back" type="slider" label="Dní dozadu (archív)" default="7" range="1,1,7" option="int"/>
+    <setting id="epg_days_fwd" type="slider" label="Dní dopredu" default="3" range="1,1,7" option="int"/>
+    <setting id="epg_refresh_h" type="slider" label="Obnova EPG (hodín)" default="12" range="1,1,24" option="int"/>
+    <setting id="export_dir" type="text" label="Export aj do priečinka" default=""/>
+  </category>
+</settings>

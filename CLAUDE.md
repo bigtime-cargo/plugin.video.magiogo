@@ -1,0 +1,116 @@
+# plugin.video.magiogo
+
+Kodi doplnok pre Magio GO (Slovak Telekom). Postavený rovnako ako
+`~/plugin.video.o2tv` — žiadny server, žiadny sidecar, každé zariadenie
+sebestačné. STAV: prototyp, netestovaný v reálnom Kodi (len mimo Kodi,
+priamymi HTTP volaniami). Pred prvým vydaním treba odskúšať prehrávanie
+(Widevine licencia, DASH, catchup) na ozajstnom Kodi s inputstream.adaptive.
+
+## Štruktúra
+
+    addon.xml                 verzia doplnku — MUSÍ sa zvýšiť pri každej zmene
+    addon.py                  zoznam kanálov + prehrávanie (plugin:// URL)
+    service.py                od štartu Kodi: denná obnova session + export
+    resources/settings.xml    login, heslo, kvalita, EPG dni
+    resources/lib/api.py      klient Magio GO (login, refresh, kanály, EPG, playback)
+    resources/lib/export.py   playlist.m3u + epg.xml pre IPTV Simple
+    resources/lib/kanaly_skupiny.py  téma kanála podľa názvu (KÓPIA z plugin.video.o2tv)
+    tools/test_export.py      testy exportu (python3 -m unittest tools.test_export -v)
+    tools/login.py            prihlásenie mimo Kodi — login+heslo rovno na príkazový riadok
+
+## API Magio GO (zistené reverzným inžinierstvom webu magiogo.sk, 13. 11. 2026)
+
+Backend je **24i mCore** (`skgo.magio.tv`), NIE Kaltura ako O2 TV. Web klient
+je balík `@24i/prj-1260-stl-nxg` verzia 5.0.4.
+
+- `appVersion` musí byť aktuálna hodnota webu (teraz `5.0.4`), inak
+  `auth/init` vráti HTTP 417 `OLD_APP_VERSION`. Keď sa to stane, treba
+  zistiť novú hodnotu — je v JS bundli `www.magiogo.sk/static/js/main.*.js`,
+  modul `8330`, pole `version`.
+- **Prihlásenie je priame**: `POST /v2/auth/init` (device info) potom
+  `POST /v2/auth/login` s `{loginOrNickname, password}`. Žiadny Keycloak,
+  žiadne SMS, žiadne SSO cookie — oproti O2 TV oveľa jednoduchšie.
+- Token: `Authorization: Bearer <accessToken>`. `expiresIn` v odpovedi je
+  **absolútny čas v ms** (epoch*1000), nie dĺžka platnosti.
+- Obnova: `POST /v2/auth/tokens` s `{refreshToken}`. Robí sa raz denne
+  (`MAX_AGE = 86400` v `api.py`), nie až pred vypršaním — rovnaký dôvod ako
+  pri O2 TV (dlhší odstup od prihlásenia = väčšie riziko, že obnova
+  neprejde a dôvod sa zistí neskoro).
+- **Limit zariadení** (`DEVICE_MAX_LIMIT` pri `stream-url`): vyriešené
+  `GET /home/listDevices` (vráti `items` + `thisDevice`) a
+  `GET /home/deleteDevice?id=...`. Testovaný účet mal limit **1 zariadenie**
+  (`api.free_device_slot()` odpojí najstaršie a zopakuje volanie).
+- **Kanály**: `GET /v2/television/channels?list=LIVE&queryScope=LIVE`.
+  Pole `channel.liveSubscription` hovorí priamo, či má used predplatné na
+  live (filtrovať na toto — Magio to na rozdiel od O2 TV nehovorí cez
+  samostatné `playbackContext` volanie na kanál, takže žiadny ekvivalent
+  `entitled_cached()` netreba). `channel.archiveSubscription` je
+  NESPOĽAHLIVÉ — bolo `false` aj na kanáli, kde ARCHIVE stream prešiel bez
+  problému; `api.channels()` sa drží len `hasArchive`. Číslo kanála je
+  `channel.defaultChannelPosition` (NIE `channelNumber`, to pole v odpovedi
+  nie je).
+- **EPG**: `GET /v2/television/epg?filter=startTime=ge=<deň>T00:00:00.000Z;
+  startTime=le=<deň+1>T00:59:59.999Z&limit=20&offset=N&list=LIVE`.
+  Odpoveď je **skupiny po kanáli** (`items: [{channel, programs: [...]}]`),
+  stránkovane po 20 (limit API), `totalCount` = počet kanálov. POZOR na
+  nekonzistentné pole s ID kanála:
+    - na úrovni **skupiny** je to `channel.channelId`
+    - na úrovni **jednotlivého programu** je to `program_item.channel.id`
+      (iný kľúč aj iná štruktúra — netreba zamieňať)
+  Časy (`startTimeUTC`/`endTimeUTC`) sú **epoch v ms** ako číslo, nie ISO
+  string (na rozdiel od staršieho addonu Sorien/plugin.video.iptv.magiogo,
+  ktorý čakal ISO formát — API sa odtedy zmenilo).
+- **Playback**: `GET /v2/television/stream-url?service=LIVE|ARCHIVE|DVR&
+  name=Web Browser&devtype=OTT_LINUX&id=<asset_id>&prof=p5&ecid=&drm=verimatrix`.
+    - `service=LIVE`, `id` = `channelId`
+    - `service=ARCHIVE`, `id` = **`scheduleId`** z EPG (top-level pole
+      programu, NIE `program.programId` — to je spoločné pre všetky
+      opakovania toho istého programu, scheduleId je jedno konkrétne
+      vysielanie; overené naživo 13. 11. 2026)
+  Vracia DASH manifest (`.mpd`), typ `dynamic`, `timeShiftBufferDepth≈PT1M`.
+  `seekingForbidden: true`, `liveSlidingWindowInSeconds: 1800`,
+  `timeshift: 240` (4 min) — pozri nižšie, prečo sa reklamy nedajú
+  preskakovať.
+- **CDN relácia**: manifest sa 307-presmeruje na konkrétny server
+  (`vlive01.cdn.magio.tv` → `s1-h25-vlive01.cdn.magio.tv`), **rovnaký
+  vzor ako O2 TV** (Broadpeak/Cetin tam, tu vlastný CDN Magio). `addon.py`
+  preto rozbaľuje presmerovanie a `service.py` má prevzatý `KeepAlive` z
+  O2 TV — **prahy (40 s do 403, 45 min max pauza) sú PREVZATÉ, NEOVERENÉ**
+  na Magio GO. Treba reálny test dlhšej pauzy v Kodi.
+- **DRM (Widevine)**: `GET /v2/home/config?language=SK` → pole
+  `drmIntegration` (`STREAM_KEEPER`/`VERIMATRIX`) a
+  `widevineStreamKeeperDrmUrl` (`https://multidrm.core.verimatrixcloud.net/widevine`).
+  Autorizácia k licenčnému serveru je **rovnaký Bearer token ako na API**
+  (zistené z JS web klienta — `DRM_AUTH_HEADER.SCHEME` je prázdne, teda
+  `Authorization: <accessToken>` bez `Bearer ` prefixu; `api.py` to tak aj
+  robí). Manifest samotný nenesie `<ContentProtection>` — DRM nastavuje
+  len `inputstream.adaptive.license_*` properties v `addon.py`.
+
+## Prečo (zatiaľ) žiadne preskakovanie reklám
+
+Na rozdiel od O2 TV (`ads.py`, SCTE-35 `EventStream` v MPD), manifest Magio
+GO **žiadne SCTE-35 značky nemá** (overené na živom kanáli 13. 11. 2026) a
+server navyše vracia `seekingForbidden: true`. Preskakovanie reklám sa
+teda zatiaľ nedá urobiť rovnako ako pri O2 TV — ak sa objaví iný mechanizmus
+(napr. iný formát v archívnych manifestoch), treba ho najprv nájsť.
+
+## Čo (zatiaľ) chýba oproti O2 TV
+
+- **Reálny test v Kodi** — login/heslo, zoznam kanálov, live aj archívne
+  prehrávanie, Widevine licencia. Doteraz overené len mimo Kodi (priame
+  HTTP volania, pozri `tools/login.py` a ad-hoc skripty v `~/magio/`).
+- **KeepAlive prahy** (40 s / 45 min) sú skopírované z O2 TV, nie zmerané
+  na Magio GO.
+- **EndWatch** (pokračovanie na ďalší program z EPG po skončení aktuálneho,
+  pozri O2 TV `service.py`) tu nie je — netestované, či to Magio GO vôbec
+  potrebuje (môže sa prejaviť rovnaký problém so zamrznutím na konci
+  statického manifestu, alebo nie).
+- **Automatické prihlásenie bez hesla v nastaveniach** (SSO cookie ako pri
+  O2 TV) — Magio GO nemá Keycloak device-flow, takže by to vyžadovalo iný
+  mechanizmus (ak vôbec existuje). Zatiaľ je jediná cesta login+heslo v
+  nastaveniach doplnku (uložené v Kodi settings.xml, nie šifrované —
+  rovnaké riziko ako pri väčšine IPTV doplnkov).
+- **Kozmetika**: `kanaly_skupiny.py` je kópia z O2 TV a nerozpoznáva
+  "Všeobecné" kanály s menami končiacimi na " HD" (napr. "Jednotka HD" padá
+  do "Ostatné", lebo O2 TV kanály "HD" v mene nenesú a pravidlo je
+  anchored na celý názov). Funkčne to nevadí, len škatuľkovanie v M3U.
