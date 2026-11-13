@@ -60,9 +60,9 @@ def build_m3u(chans, epg_url=None):
         if c.get("number"):
             attrs += ' tvg-chno="%s"' % c["number"]
         if c.get("has_archive"):
-            # ucet ma archiv len cca 4 h dozadu (kanal.timeshift=240 min), vsetko
-            # starsie server odmieta ("Nemate aktivovanu sluzbu Magio TV Archiv")
-            attrs += ' catchup="default" catchup-days="1"'
+            # catchup-days=-1: program je prehratelny len ak ma catchup-id v
+            # epg.xml (dava ho render_xmltv len programom v archive, cca 4 h)
+            attrs += ' catchup="default" catchup-days="-1"'
             attrs += (' catchup-source="%s?action=play&cid=%s'
                       '&sid={catchup-id}&start_ts={utc}&end_ts={utcend}"'
                       % (PLUGIN, cid))
@@ -71,21 +71,24 @@ def build_m3u(chans, epg_url=None):
     return "\n".join(out) + "\n"
 
 
-def build_xmltv(api, chans, days_back=7, days_fwd=3, log=None, should_stop=None):
-    """Vracia (xml, pocet zlyhanych dni). Stahuje po dnoch (API vracia
-    jednu skupinu programov na kanal a den)."""
+# Hlbka archivu: server prehra program, ktoreho ZACIATOK nie je starsi nez
+# `timeshift` kanala (240 min; overene 13. 11. 2026: -3.95 h OK, -4.12 h nie).
+# Zelena gulicka v Kodi sa ridi pritomnostou catchup-id (catchup-days=-1), tak
+# ho davame len programom, ktore skoncili a pocas dalsich ~45 min (obnova
+# epg.xml + znovunacitanie IPTV Simple) budu urcite este v archive.
+ARCHIVE_MIN = 240
+SAFETY_MIN = 45
+CATCHUP_WINDOW = (ARCHIVE_MIN - SAFETY_MIN) * 60
+
+
+def collect_programmes(api, chans, days_back=7, days_fwd=3, log=None, should_stop=None):
+    """Vracia (zoznam programov, pocet zlyhanych dni). Stahuje po dnoch (API
+    vracia jednu skupinu programov na kanal a den). Program je dict s klucmi
+    ch, start, stop (epoch s), title, desc, sid (scheduleId)."""
     now = int(time.time())
     failed = 0
     id2name = {c["id"]: c["name"] for c in chans}
-
-    xml = ['<?xml version="1.0" encoding="UTF-8"?>',
-           '<tv generator-info-name="plugin.video.magiogo">']
-    for c in chans:
-        xml.append('<channel id="%s"><display-name>%s</display-name>%s</channel>' % (
-            xesc(c["id"]), xesc(c["name"]),
-            '<icon src="%s"/>' % xesc(c["logo"]) if c.get("logo") else ""))
-
-    day_count = days_back + days_fwd + 1
+    progs = []
     for n in range(-days_back, days_fwd + 1):
         if should_stop and should_stop():
             raise Aborted()
@@ -107,24 +110,50 @@ def build_xmltv(api, chans, days_back=7, days_fwd=3, log=None, should_stop=None)
                 if ps is None or pe is None:
                     continue
                 prog = p.get("program") or {}
-                # catchup-id = scheduleId konkretneho vysielania; IPTV Simple ho
-                # dosadi do {catchup-id} v catchup-source, takze archiv nehada
-                # program podla casu (IPTV Simple posuva start_ts o -5 min a
-                # end_ts o +15 min, co vybralo predchadzajuci program).
-                sid = p.get("scheduleId")
-                xml.append('<programme start="%s" stop="%s" channel="%s"%s>' % (
-                    fmt(ps / 1000.0), fmt(pe / 1000.0), xesc(ch),
-                    ' catchup-id="%s"' % xesc(sid) if sid else ""))
-                xml.append('<title>%s</title>' % xesc(prog.get("title", "")))
-                if prog.get("description"):
-                    xml.append('<desc>%s</desc>' % xesc(prog["description"]))
-                xml.append('</programme>')
+                progs.append({"ch": ch, "start": ps / 1000.0, "stop": pe / 1000.0,
+                              "title": prog.get("title", ""),
+                              "desc": prog.get("description") or "",
+                              "sid": p.get("scheduleId")})
+    return progs, failed
+
+
+def render_xmltv(chans, progs, now=None):
+    """XMLTV z uz stiahnutych programov (bez siete). catchup-id = scheduleId
+    konkretneho vysielania; IPTV Simple ho dosadi do {catchup-id} v
+    catchup-source (nehlada sa podla casu - IPTV Simple posuva start_ts o -5 min
+    a end_ts o +15 min, co vybralo predchadzajuci program). Dostane ho len
+    skonceny program z poslednych CATCHUP_WINDOW sekund na kanali s archivom."""
+    now = time.time() if now is None else now
+    archive = {c["id"] for c in chans if c.get("has_archive")}
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>',
+           '<tv generator-info-name="plugin.video.magiogo">']
+    for c in chans:
+        xml.append('<channel id="%s"><display-name>%s</display-name>%s</channel>' % (
+            xesc(c["id"]), xesc(c["name"]),
+            '<icon src="%s"/>' % xesc(c["logo"]) if c.get("logo") else ""))
+    for p in progs:
+        cid = ""
+        if (p["sid"] and p["ch"] in archive and p["stop"] <= now
+                and p["start"] >= now - CATCHUP_WINDOW):
+            cid = ' catchup-id="%s"' % xesc(p["sid"])
+        xml.append('<programme start="%s" stop="%s" channel="%s"%s>' % (
+            fmt(p["start"]), fmt(p["stop"]), xesc(p["ch"]), cid))
+        xml.append('<title>%s</title>' % xesc(p["title"]))
+        if p["desc"]:
+            xml.append('<desc>%s</desc>' % xesc(p["desc"]))
+        xml.append('</programme>')
     xml.append('</tv>')
-    return "\n".join(xml), failed
+    return "\n".join(xml)
+
+
+def build_xmltv(api, chans, days_back=7, days_fwd=3, log=None, should_stop=None):
+    """Vracia (xml, pocet zlyhanych dni)."""
+    progs, failed = collect_programmes(api, chans, days_back, days_fwd, log, should_stop)
+    return render_xmltv(chans, progs), failed
 
 
 def export_all(api, profile_dir, days_back=7, days_fwd=3, log=None, extra_dir=None,
-               should_stop=None, hide_o2=True, hide_regional=True):
+               should_stop=None, hide_o2=True, hide_regional=True, cache=None):
     """Vygeneruje playlist a EPG. Vracia (počet kanálov, počet programov).
     Pri ukončovaní Kodi vyhodí Aborted a nezapíše nič. Vyhodí Incomplete,
     keď časť EPG chýba a staré EPG je ešte čerstvé."""
@@ -132,7 +161,10 @@ def export_all(api, profile_dir, days_back=7, days_fwd=3, log=None, extra_dir=No
     if should_stop and should_stop():
         raise Aborted()
 
-    xml, failed = build_xmltv(api, chans, days_back, days_fwd, log, should_stop)
+    progs, failed = collect_programmes(api, chans, days_back, days_fwd, log, should_stop)
+    xml = render_xmltv(chans, progs)
+    if cache is not None:
+        cache.update(chans=chans, progs=progs)
 
     epg_main = os.path.join(profile_dir, "epg.xml")
     if failed:
@@ -159,4 +191,20 @@ def export_all(api, profile_dir, days_back=7, days_fwd=3, log=None, extra_dir=No
         except Exception as e:
             if log:
                 log("zápis do %s zlyhal: %s" % (os.path.dirname(m3u_path), e))
-    return len(chans), xml.count("<programme")
+    return len(chans), len(progs)
+
+
+def rerender_epg(profile_dir, cache, extra_dir=None, log=None):
+    """Prepise len epg.xml z pamate (bez siete), aby sa catchup-id posunulo s
+    casom. Vracia pocet programov s catchup-id."""
+    xml = render_xmltv(cache["chans"], cache["progs"])
+    paths = [os.path.join(profile_dir, "epg.xml")]
+    if extra_dir:
+        paths.append(os.path.join(extra_dir, "magiogo_epg.xml"))
+    for path in paths:
+        try:
+            _write(path, xml)
+        except Exception as e:
+            if log:
+                log("zápis EPG do %s zlyhal: %s" % (path, e))
+    return xml.count("catchup-id=")

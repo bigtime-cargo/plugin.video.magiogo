@@ -24,7 +24,7 @@ ADDON = xbmcaddon.Addon()
 sys.path.insert(0, xbmcvfs.translatePath(
     os.path.join(ADDON.getAddonInfo("path"), "resources", "lib")))
 from api import MagioAPI, MagioError, UA   # noqa: E402
-from export import export_all, Aborted   # noqa: E402
+from export import export_all, rerender_epg, Aborted   # noqa: E402
 
 
 class Store:
@@ -230,6 +230,8 @@ def main():
     profile = xbmcvfs.translatePath(ADDON.getAddonInfo("profile"))
     KeepAlive(monitor).start()
     last_export = 0
+    last_render = 0
+    cache = {}
     while not monitor.abortRequested():
         try:
             ok = tick(api)
@@ -250,8 +252,9 @@ def main():
                                       ADDON.getSetting("export_dir") or None,
                                       should_stop=monitor.abortRequested,
                                       hide_o2=ADDON.getSettingBool("hide_o2"),
-                                      hide_regional=ADDON.getSettingBool("hide_regional"))
-                    last_export = time.time()
+                                      hide_regional=ADDON.getSettingBool("hide_regional"),
+                                      cache=cache)
+                    last_export = last_render = time.time()
                     log("export hotový: %d kanálov, %d programov" % (n, p))
                 except Aborted:
                     log("export prerušený, Kodi sa vypína")
@@ -259,6 +262,14 @@ def main():
                 except Exception as e:
                     log("export zlyhal: %s" % e, True)
                     last_export = time.time() - every + EXPORT_RETRY
+        if cache and time.time() - last_render > 540:
+            try:
+                n = rerender_epg(profile, cache, ADDON.getSetting("export_dir") or None,
+                                 lambda m: log(m, True))
+                last_render = time.time()
+                log("EPG prepísané z pamäte, programov v archíve: %d" % n)
+            except Exception as e:
+                log("prepis EPG zlyhal: %s" % e, True)
         if sleep_abortable(monitor, 600):
             break
     log("service koniec")

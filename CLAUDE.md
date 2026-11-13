@@ -110,7 +110,15 @@ je balík `@24i/prj-1260-stl-nxg` verzia 5.0.4.
   Staršie programy server odmieta tou istou hláškou; web pri 2 dni starom
   programe ponúka len "Nahrať", nie "Pozerať". `archiveSubscription` je
   `false` pri všetkých kanáloch a zodpovedá tomu (nie je "nespoľahlivý").
-  Preto `catchup-days="1"` v playliste.
+- **Presné pravidlo (overené 13. 11. 2026 na 26 programoch):** program sa dá
+  prehrať, ak jeho ZAČIATOK nie je starší než 240 min (−3,95 h OK, −4,12 h
+  nie), nezáleží na konci. Rovnaké na všetkých kanáloch (`timeshift=240`).
+- **Zelená guľička v Kodi** = `IsEPGTagPlayable` v IPTV Simple. Pri
+  `catchup-days="-1"` je prehrateľný len program s `catchup-id` v XMLTV, preto
+  `render_xmltv()` dáva `catchup-id` len skončeným programom z posledných
+  `CATCHUP_WINDOW` (195 min = 240 − 45 min rezerva na prepis EPG + znovunačítanie
+  IPTV Simple). Služba prepisuje `epg.xml` z pamäte každých ~10 min (bez siete),
+  IPTV Simple ho načíta pri obnove inštancie (odporúča sa 30 min).
 - **IPTV Simple posúva čas v catchup URL** (`start_ts` o -5 min,
   `end_ts` o +15 min, nastavenia `catchupWatchEpg*BufferMins`). Hľadanie
   programu podľa `start_ts` preto vybralo PREDCHÁDZAJÚCI program. Riešenie:

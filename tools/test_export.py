@@ -62,18 +62,50 @@ class CatchupId(unittest.TestCase):
         l = [l for l in export.build_m3u(CHANS).splitlines() if l.startswith("#EXTINF")][0]
         self.assertIn("&sid={catchup-id}&start_ts={utc}&end_ts={utcend}", l)
 
-    def test_programme_nesie_catchup_id(self):
+    CH = [{"id": "4099", "name": "Jednotka HD", "has_archive": True},
+          {"id": "9", "name": "Bez archivu", "has_archive": False}]
+
+    def progs(self, now):
+        h = 3600.0
+        mk = lambda ch, start_h, dur_h, sid: {
+            "ch": ch, "start": now - start_h * h, "stop": now - (start_h - dur_h) * h,
+            "title": "T", "desc": "", "sid": sid}
+        return [mk("4099", 3.0, 1.0, 111),     # skoncil, 3 h dozadu -> archiv
+                mk("4099", 3.5, 0.5, 222),     # 3.5 h dozadu (mimo okna 3h15) -> nie
+                mk("4099", 5.0, 1.0, 333),     # stary -> nie
+                mk("4099", 0.5, 1.0, 444),     # este bezi -> nie
+                mk("4099", -1.0, 1.0, 555),    # buduci -> nie
+                mk("9", 2.0, 1.0, 666),        # kanal bez archivu -> nie
+                mk("4099", 2.0, 0.5, None)]    # bez scheduleId -> nie
+
+    def test_catchup_id_len_pre_programy_v_archive(self):
+        xml = export.render_xmltv(self.CH, self.progs(1794600000.0), now=1794600000.0)
+        ids = re.findall(r'catchup-id="(\d+)"', xml)
+        self.assertEqual(ids, ["111"])
+
+    def test_okno_archivu_je_kratsie_nez_hlbka(self):
+        self.assertLess(export.CATCHUP_WINDOW, export.ARCHIVE_MIN * 60)
+
+    def test_catchup_days_je_ignorovane(self):
+        l = [l for l in export.build_m3u(CHANS).splitlines() if l.startswith("#EXTINF")][0]
+        self.assertIn('catchup-days="-1"', l)
+
+    def test_build_xmltv_spaja_stiahnutie_a_render(self):
         class FakeApi:
             def epg_day(self, ts):
+                n = 1794600000
                 return [{"channel": {"channelId": 4099}, "programs": [
-                    {"startTimeUTC": 1794578400000, "endTimeUTC": 1794581400000,
-                     "scheduleId": 140868577452082, "program": {"title": "Otec Brown"}},
-                    {"startTimeUTC": 1794581400000, "endTimeUTC": 1794582000000,
-                     "program": {"title": "Bez ID"}}]}]
-        xml, failed = export.build_xmltv(FakeApi(), [{"id": "4099", "name": "Jednotka HD"}],
-                                         days_back=0, days_fwd=0)
+                    {"startTimeUTC": (n - 3 * 3600) * 1000, "endTimeUTC": (n - 2 * 3600) * 1000,
+                     "scheduleId": 140868577452082, "program": {"title": "Otec Brown"}}]}]
+        import time as _t
+        real = _t.time
+        export.time.time = lambda: 1794600000.0
+        try:
+            xml, failed = export.build_xmltv(FakeApi(), self.CH, days_back=0, days_fwd=0)
+        finally:
+            export.time.time = real
         self.assertIn(' catchup-id="140868577452082">', xml)
-        self.assertEqual(xml.count("catchup-id="), 1)
+        self.assertEqual(failed, 0)
 
 
 class FiltrKanalov(unittest.TestCase):
