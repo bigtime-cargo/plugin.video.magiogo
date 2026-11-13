@@ -149,6 +149,14 @@ Reklamné bloky dodáva osobitný endpoint a prehráva ich web klient sám:
   true v stream-url), NEOVERENÉ - treba zistiť, či sa dá v Kodi vôbec seekovať
   v archívnom streame.
 
+**Overené na ostatných kanáloch (13. 11. 2026):** 17 živých manifestov
+kanálov, ktoré nie sú na O2 TV (AMC, JOJ Svet, Nova Sport, Eurosport,
+Discovery, JOJ Cinema, ...), nemá `EventStream`, SCTE-35 ani `emsg`, a
+`schedules/ads` vracia pre 34 z 39 týchto kanálov `ADS_NOT_REQUIRED`. Pre
+kanály mimo 8 vyššie sa preto reklamy preskakovať nedajú (nie je žiadna
+značka ani zoznam blokov). Zmysel by to malo len pre tých 8 kanálov, ktoré
+sú však aj na O2 TV, kde preskakovanie funguje plne.
+
 ## Čo (zatiaľ) chýba oproti O2 TV
 
 - **KeepAlive prahy** (40 s / 45 min) sú skopírované z O2 TV, nie zmerané
