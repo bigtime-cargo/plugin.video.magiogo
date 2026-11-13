@@ -6,6 +6,7 @@ takže tu nie je potrebný žiadny ekvivalent entitled_cached()."""
 import os, time, datetime, tempfile
 
 from kanaly_skupiny import group_title
+from kanaly_filter import filter_channels
 
 PLUGIN = "plugin://plugin.video.magiogo/"
 
@@ -123,11 +124,11 @@ def build_xmltv(api, chans, days_back=7, days_fwd=3, log=None, should_stop=None)
 
 
 def export_all(api, profile_dir, days_back=7, days_fwd=3, log=None, extra_dir=None,
-               should_stop=None):
+               should_stop=None, hide_o2=True, hide_regional=True):
     """Vygeneruje playlist a EPG. Vracia (počet kanálov, počet programov).
     Pri ukončovaní Kodi vyhodí Aborted a nezapíše nič. Vyhodí Incomplete,
     keď časť EPG chýba a staré EPG je ešte čerstvé."""
-    chans = api.channels()
+    chans = filter_channels(api.channels(), hide_o2, hide_regional)
     if should_stop and should_stop():
         raise Aborted()
 

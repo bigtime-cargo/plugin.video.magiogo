@@ -76,6 +76,47 @@ class CatchupId(unittest.TestCase):
         self.assertEqual(xml.count("catchup-id="), 1)
 
 
+class FiltrKanalov(unittest.TestCase):
+    CH = [
+        {"id": "1", "name": "Jednotka HD", "number": 1},
+        {"id": "2", "name": "JOJ HD", "number": 5},          # O2: TV JOJ
+        {"id": "3", "name": "Kanal 1 HD", "number": 33},     # O2: Kanal1
+        {"id": "4", "name": "AMC HD", "number": 12},
+        {"id": "5", "name": "Eurosport 1 HD", "number": 65},
+        {"id": "6", "name": "TV Bratislava", "number": 501},
+        {"id": "7", "name": "TV9", "number": 522},
+        {"id": "8", "name": "CNN Intl. Europe", "number": 233},
+        {"id": "9", "name": "ČT24 HD", "number": 22},
+        {"id": "10", "name": "ŠPORT HD", "number": 79},
+    ]
+
+    def names(self, **kw):
+        import kanaly_filter
+        return [c["name"] for c in kanaly_filter.filter_channels(self.CH, **kw)]
+
+    def test_predvolene_skryje_o2_aj_regionalne(self):
+        self.assertEqual(self.names(), ["AMC HD", "Eurosport 1 HD", "CNN Intl. Europe"])
+
+    def test_len_o2(self):
+        n = self.names(hide_o2=True, hide_regional=False)
+        self.assertIn("TV Bratislava", n)
+        self.assertNotIn("JOJ HD", n)
+
+    def test_len_regionalne(self):
+        n = self.names(hide_o2=False, hide_regional=True)
+        self.assertIn("Jednotka HD", n)
+        self.assertNotIn("TV9", n)
+
+    def test_nic_neskryva(self):
+        self.assertEqual(len(self.names(hide_o2=False, hide_regional=False)), len(self.CH))
+
+    def test_export_playlist_nema_skryte(self):
+        import kanaly_filter
+        m3u = export.build_m3u(kanaly_filter.filter_channels(self.CH))
+        self.assertNotIn("Jednotka", m3u)
+        self.assertIn("AMC HD", m3u)
+
+
 class XmlEscaping(unittest.TestCase):
     def test_xesc_specialne_znaky(self):
         self.assertEqual(export.xesc('<a & "b" \'c\'>'),

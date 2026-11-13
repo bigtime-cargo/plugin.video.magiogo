@@ -248,7 +248,9 @@ def main():
                     n, p = export_all(api, profile, db, df,
                                       lambda m: log(m, True),
                                       ADDON.getSetting("export_dir") or None,
-                                      should_stop=monitor.abortRequested)
+                                      should_stop=monitor.abortRequested,
+                                      hide_o2=ADDON.getSettingBool("hide_o2"),
+                                      hide_regional=ADDON.getSettingBool("hide_regional"))
                     last_export = time.time()
                     log("export hotový: %d kanálov, %d programov" % (n, p))
                 except Aborted:

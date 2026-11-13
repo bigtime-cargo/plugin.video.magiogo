@@ -11,6 +11,7 @@ BASE = sys.argv[0] if len(sys.argv) > 0 else "plugin://plugin.video.magiogo/"
 sys.path.insert(0, xbmcvfs.translatePath(
     os.path.join(ADDON.getAddonInfo("path"), "resources", "lib")))
 from api import MagioAPI, MagioError, UA   # noqa: E402
+from kanaly_filter import filter_channels   # noqa: E402
 
 # Na rozdiel od O2 TV sa manifest ziveho vysielania presmeruje na konkretny
 # CDN server (s1-h25-vlive01...) rovnako ako O2 - preto rovnaky trik:
@@ -92,6 +93,8 @@ def list_channels(api):
         xbmcplugin.endOfDirectory(HANDLE)
         return
 
+    chans = filter_channels(chans, ADDON.getSettingBool("hide_o2"),
+                            ADDON.getSettingBool("hide_regional"))
     xbmcplugin.setContent(HANDLE, "videos")
     for c in chans:
         label = "%s. %s" % (c["number"], c["name"]) if c["number"] else c["name"]

@@ -8,6 +8,10 @@
   <category label="Prehrávanie">
     <setting id="max_bitrate" type="labelenum" label="Max. kvalita" values="Auto|1080p|720p|576p" default="Auto"/>
   </category>
+  <category label="Kanály">
+    <setting id="hide_o2" type="bool" label="Skryť kanály, ktoré sú na O2 TV" default="true"/>
+    <setting id="hide_regional" type="bool" label="Skryť regionálne televízie (č. 500+)" default="true"/>
+  </category>
   <category label="EPG">
     <setting id="epg_days_back" type="slider" label="Dní dozadu (archív)" default="7" range="1,1,7" option="int"/>
     <setting id="epg_days_fwd" type="slider" label="Dní dopredu" default="3" range="1,1,7" option="int"/>
