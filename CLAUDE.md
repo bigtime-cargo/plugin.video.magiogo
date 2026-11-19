@@ -181,10 +181,12 @@ sú však aj na O2 TV, kde preskakovanie funguje plne.
 
 - **KeepAlive prahy** (40 s / 45 min) sú skopírované z O2 TV, nie zmerané
   na Magio GO — treba reálny test dlhšej pauzy v Kodi.
-- **EndWatch** (pokračovanie na ďalší program z EPG po skončení aktuálneho,
-  pozri O2 TV `service.py`) tu nie je — netestované, či to Magio GO vôbec
-  potrebuje (môže sa prejaviť rovnaký problém so zamrznutím na konci
-  statického manifestu, alebo nie).
+- **EndWatch** (0.1.6, port z O2 TV `service.py`): manifest archívu je
+  ohraničený na jeden program (`Manifest?start=..&end=..`), po jeho konci
+  prehrávanie len stojí ("stream stalled", zistené na telke 20. 11. 2026 pri
+  Nova Sport 2 o polnoci). Služba to spozná (poloha stojí ≤15 s pred koncom,
+  10 s) a cez EPG pustí ďalší program. NEOVERENÉ naživo — po nasadení
+  skontrolovať v kodi.log riadok "koniec programu ... púšťam".
 - **Automatické prihlásenie bez hesla v nastaveniach** (SSO cookie ako pri
   O2 TV) — Magio GO nemá Keycloak device-flow, takže by to vyžadovalo iný
   mechanizmus (ak vôbec existuje). Zatiaľ je jediná cesta login+heslo v
